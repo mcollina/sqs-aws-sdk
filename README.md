@@ -91,9 +91,14 @@ occurs or if amazon sqs is temporary unavailable.
 ## Acknowledgements
 
 This project was kindly sponsored by [nearForm](http://nearform.com).
+It was extracted from [aws-autoscaling-container](http://npm.im/aws-autoscaling-container).
 
 [@mafintosh](http://github.com/mafintosh) for its awesome
-[sqs](http://npm.im/sqs) module.
+[sqs](http://npm.im/sqs) module. Part of the doc was borrowed from that
+module, and also for the API contract.
+
+[@Nss](http://github.com) for its work on the nScale
+[aws-autoscaling-container](http://npm.im/aws-autoscaling-container).
 
 ## License
 
