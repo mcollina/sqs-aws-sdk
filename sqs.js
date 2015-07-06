@@ -13,7 +13,8 @@ var defaults = {
   VisibilityTimeout: 60 * 5,  // number of seconds before the message goes back to the queue
   WaitTimeSeconds: 20,
   wait: 2000,
-  workers: 1
+  workers: 1,
+  maxErrors: 42
 }
 
 function SQS (sdk) {
@@ -46,9 +47,11 @@ function SQS (sdk) {
 
 inherits(SQS, EE)
 
-SQS.prototype._getQueueUrl = function (queue, done) {
+SQS.prototype._getQueueUrl = function (queue, done, errors) {
   var queueUrl = this._nameCache.get(queue)
   var that = this
+
+  errors = errors === undefined ? 0 : errors
 
   if (queueUrl) {
     debug('cached queue url', queueUrl)
@@ -61,7 +64,14 @@ SQS.prototype._getQueueUrl = function (queue, done) {
     QueueName: queue
   }, function (err, result) {
     if (err) {
-      return that.emit('error', err)
+      if (++errors > 42) {
+        return that.emit('error', err)
+      } else {
+        debug('error, retry', err)
+        return setTimeout(function () {
+          that._getQueueUrl(queue, done, errors)
+        }, 1000)
+      }
     }
 
     debug('fetched queue url', result.QueueUrl)
@@ -94,10 +104,13 @@ SQS.prototype.pull = function (queue, opts, func) {
   var raw = opts.raw
   var wait = opts.wait
   var workers = opts.workers
+  var maxErrors = opts.maxErrors
+  var errors = 0
 
   delete opts.raw
   delete opts.wait
   delete opts.workers
+  delete opts.maxErrors
 
   this._getQueueUrl(queue, function (queueUrl) {
     opts.QueueUrl = queueUrl
@@ -115,9 +128,10 @@ SQS.prototype.pull = function (queue, opts, func) {
 
   function onMessages (err, results) {
     if (err) {
-      return that.emit('error', err)
+      return errorAndRetry(err)
     }
 
+    errors = 0
     parallel(that, processMessage, results.Messages || [], scheduleReceive)
   }
 
@@ -165,17 +179,49 @@ SQS.prototype.pull = function (queue, opts, func) {
 
     done(null, body)
   }
+
+  function errorAndRetry (err) {
+    if (!err) {
+      return false
+    }
+
+    errors++
+
+    if (errors === maxErrors) {
+      that.emit('error', err)
+    } else {
+      debug('error, retry', err)
+      scheduleReceive()
+    }
+
+    return true
+  }
 }
 
-SQS.prototype.push = function (queue, msg, done) {
+SQS.prototype.push = function (queue, msg, done, errors) {
   var that = this
+  errors = errors === undefined ? 0 : errors
   this._getQueueUrl(queue, function (queueUrl) {
     that.sdk.sendMessage({
       QueueUrl: queueUrl,
       MessageBody: JSON.stringify(msg)
-    }, done || function (err) {
+    }, function (err) {
       if (err) {
-        that.emit('error', err)
+        errors++
+
+        if (errors > 42) {
+          if (done) {
+            done(err)
+          } else {
+            that.emit('error', err)
+          }
+        } else {
+          setTimeout(function () {
+            that.push(queue, msg, done, errors)
+          }, defaults.wait)
+        }
+      } else {
+        done()
       }
     })
   })
