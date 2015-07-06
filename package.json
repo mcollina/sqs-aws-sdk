@@ -1,6 +1,6 @@
 {
   "name": "sqs-aws-sdk",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Push and pull from SQS using the AWS SDK",
   "main": "sqs.js",
   "scripts": {
