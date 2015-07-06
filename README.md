@@ -1,4 +1,4 @@
-# sqs-aws-sdk
+# sqs-aws-sdk&nbsp;&nbsp;[![Build Status](https://travis-ci.org/mcollina/sqs-aws-sdk.png)](https://travis-ci.org/mcollina/sqs-aws-sdk)
 
 A message queue using [Amazon Simple Queue
 Service](http://docs.amazonwebservices.com/AWSSimpleQueueService/latest/APIReference/Welcome.html) using the AWS SDK.
