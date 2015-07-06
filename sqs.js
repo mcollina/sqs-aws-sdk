@@ -1,5 +1,6 @@
 'use strict'
 
+var debug = require('debug')('sqs')
 var EE = require('events').EventEmitter
 var inherits = require('util').inherits
 var xtend = require('xtend')
@@ -39,6 +40,7 @@ function SQS (sdk) {
       this.stopped = true
       this.emit('end')
     }
+    debug('workerEnded', this._workers)
   })
 }
 
@@ -49,6 +51,7 @@ SQS.prototype._getQueueUrl = function (queue, done) {
   var that = this
 
   if (queueUrl) {
+    debug('cached queue url', queueUrl)
     // non-standard callback, we handle the errors
     // internally
     return done(queueUrl)
@@ -60,6 +63,8 @@ SQS.prototype._getQueueUrl = function (queue, done) {
     if (err) {
       return that.emit('error', err)
     }
+
+    debug('fetched queue url', result.QueueUrl)
 
     return done(result.QueueUrl)
   })
@@ -104,6 +109,7 @@ SQS.prototype.pull = function (queue, opts, func) {
   })
 
   function receiveMessages () {
+    debug('receiveMessages')
     that.sdk.receiveMessage(opts, onMessages)
   }
 
@@ -121,22 +127,28 @@ SQS.prototype.pull = function (queue, opts, func) {
       return
     }
 
+    debug('scheduling receive in', wait)
+
     setTimeout(receiveMessages, wait)
   }
 
   function deleteMessage (done) {
-    return that.sdk.deleteMessage({
+    debug('deleting message')
+    that.sdk.deleteMessage({
       QueueUrl: opts.QueueUrl,
       ReceiptHandle: this.ReceiptHandle
     }, done)
   }
 
   function processMessage (message, done) {
+    debug('processing message')
     processFall.call(message, function (err) {
       if (err) {
-        // do not delete the message
+        // the message is not deleted log it
         that.emit('errorProcessing', err)
       }
+
+      debug('message processed', err)
 
       done()
     })
