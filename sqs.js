@@ -11,7 +11,8 @@ var defaults = {
   MaxNumberOfMessages: 1,
   VisibilityTimeout: 60 * 5,  // number of seconds before the message goes back to the queue
   WaitTimeSeconds: 20,
-  wait: 2000
+  wait: 2000,
+  workers: 1
 }
 
 function SQS (sdk) {
@@ -28,6 +29,16 @@ function SQS (sdk) {
   this._nameCache = new LRU({
     max: 500,
     maxAge: 1000 * 60 * 60
+  })
+
+  this._workers = 0
+
+  EE.call(this)
+  this.on('workerEnded', function () {
+    if (--this._workers === 0) {
+      this.stopped = true
+      this.emit('end')
+    }
   })
 }
 
@@ -77,17 +88,22 @@ SQS.prototype.pull = function (queue, opts, func) {
 
   var raw = opts.raw
   var wait = opts.wait
+  var workers = opts.workers
 
   delete opts.raw
   delete opts.wait
+  delete opts.workers
 
   this._getQueueUrl(queue, function (queueUrl) {
     opts.QueueUrl = queueUrl
-    receiveMessages()
+
+    for (var i = 0; i < workers; i++) {
+      that._workers++
+      receiveMessages()
+    }
   })
 
   function receiveMessages () {
-    console.log('receiveMessages')
     that.sdk.receiveMessage(opts, onMessages)
   }
 
@@ -101,8 +117,7 @@ SQS.prototype.pull = function (queue, opts, func) {
 
   function scheduleReceive () {
     if (that.stopping) {
-      that.stopped = true
-      that.emit('end')
+      that.emit('workerEnded')
       return
     }
 

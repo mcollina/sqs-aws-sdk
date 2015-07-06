@@ -104,3 +104,83 @@ test('push and pull multiple times', function (t) {
     done()
   })
 })
+
+test('multiple pulls', function (t) {
+  t.plan(5)
+  t.timeoutAfter(30000)
+
+  var queue = sqs(sdk)
+  var expected = [{
+    hello: 'world1'
+  }, {
+    hello: 'world2'
+  }, {
+    hello: 'world3'
+  }]
+
+  series(queue, function (msg, done) {
+    this.push(process.env.SQS_QUEUE, msg, done)
+  }, [].concat(expected), function (err) {
+    t.error(err, 'no error')
+  })
+
+  queue.on('errorProcessing', console.log)
+
+  queue.pull(process.env.SQS_QUEUE, {
+    wait: 0,
+    WaitTimeSeconds: 0
+  }, onMessage)
+
+  queue.pull(process.env.SQS_QUEUE, {
+    wait: 0,
+    WaitTimeSeconds: 0
+  }, onMessage)
+
+  function onMessage (message, done) {
+    t.deepEqual(message, expected.shift(), 'message matches')
+
+    if (expected.length === 0) {
+      queue.stop(t.notOk.bind(t))
+    }
+
+    done()
+  }
+})
+
+test('multiple workers', function (t) {
+  t.plan(5)
+  t.timeoutAfter(30000)
+
+  var queue = sqs(sdk)
+  var expected = [{
+    hello: 'world1'
+  }, {
+    hello: 'world2'
+  }, {
+    hello: 'world3'
+  }]
+
+  series(queue, function (msg, done) {
+    this.push(process.env.SQS_QUEUE, msg, done)
+  }, [].concat(expected), function (err) {
+    t.error(err, 'no error')
+  })
+
+  queue.on('errorProcessing', console.log)
+
+  queue.pull(process.env.SQS_QUEUE, {
+    wait: 0,
+    WaitTimeSeconds: 0,
+    workers: 2
+  }, onMessage)
+
+  function onMessage (message, done) {
+    t.deepEqual(message, expected.shift(), 'message matches')
+
+    if (expected.length === 0) {
+      queue.stop(t.notOk.bind(t))
+    }
+
+    done()
+  }
+})
